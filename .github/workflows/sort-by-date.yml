@@ -1,0 +1,64 @@
+# GitHub Actions workflow to sort used-words.json by date (newest first)
+# Place this file in .github/workflows/sort-by-date.yml in your WGHA repo
+
+name: Sort Used Words by Date
+
+on:
+  workflow_dispatch:  # Manual trigger only
+
+jobs:
+  sort-words:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Sort used-words.json by date (newest first)
+        run: |
+          python3 << 'EOF'
+          import json
+
+          # Read the file
+          with open('used-words.json', 'r') as f:
+              data = json.load(f)
+
+          # Sort by date (value) in reverse order (newest first)
+          sorted_data = dict(sorted(data.items(), key=lambda x: x[1], reverse=True))
+
+          # Write back with nice formatting
+          with open('used-words.json', 'w') as f:
+              json.dump(sorted_data, f, indent=2)
+              f.write('\n')  # Add trailing newline
+
+          print(f"Sorted {len(sorted_data)} words by date (newest first)")
+
+          # Show first 5 entries
+          for i, (word, date) in enumerate(sorted_data.items()):
+              if i >= 5:
+                  break
+              print(f"  {word}: {date}")
+          EOF
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet used-words.json; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push if changed
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add used-words.json
+          git commit -m "Sort used-words.json by date (newest first)"
+          git push
